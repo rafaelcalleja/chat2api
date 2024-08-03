@@ -18,6 +18,7 @@ from chatgpt.reverseProxy import chatgpt_reverse_proxy
 from utils.Logger import logger
 from utils.config import api_prefix, scheduled_refresh
 from utils.retry import async_retry
+from utils.config import retry_times
 
 warnings.filterwarnings("ignore")
 
@@ -58,33 +59,71 @@ async def to_send_conversation(request_data, req_token):
         raise HTTPException(status_code=500, detail="Server error")
 
 
+from starlette.responses import StreamingResponse
+from starlette.exceptions import HTTPException
+
+
+async def custom_streaming_response(generator, **kwargs):
+    first_chunk = True
+    async for chunk in generator:
+        if first_chunk:
+            first_chunk = False
+            if chunk == 'data: [DONE]\n\n':
+                raise HTTPException(status_code=204, detail="No content")
+            yield chunk
+        else:
+            yield chunk
+
+    if first_chunk:
+        raise HTTPException(status_code=204, detail="No content")
+
 @app.post(f"/{api_prefix}/v1/chat/completions" if api_prefix else "/v1/chat/completions")
 async def send_conversation(request: Request, req_token: str = Depends(oauth2_scheme)):
-    try:
-        request_data = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail={"error": "Invalid JSON body"})
+    max_retries = retry_times
+    retry_count = 0
 
-    chat_service = await async_retry(to_send_conversation, request_data, req_token)
-    try:
-        await chat_service.prepare_send_conversation()
-        res = await chat_service.send_conversation()
-        if isinstance(res, types.AsyncGeneratorType):
-            background = BackgroundTask(chat_service.close_client)
-            return StreamingResponse(res, media_type="text/event-stream", background=background)
-        else:
-            background = BackgroundTask(chat_service.close_client)
-            return JSONResponse(res, media_type="application/json", background=background)
-    except HTTPException as e:
-        await chat_service.close_client()
-        if e.status_code == 500:
-            logger.error(f"Server error, {str(e)}")
-            raise HTTPException(status_code=500, detail="Server error")
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
-    except Exception as e:
-        await chat_service.close_client()
-        logger.error(f"Server error, {str(e)}")
-        raise HTTPException(status_code=500, detail="Server error")
+    while retry_count < max_retries:
+        try:
+            try:
+                request_data = await request.json()
+            except Exception:
+                raise HTTPException(status_code=400, detail={"error": "Invalid JSON body"})
+
+            chat_service = await async_retry(to_send_conversation, request_data, req_token)
+            try:
+                await chat_service.prepare_send_conversation()
+                res = await chat_service.send_conversation()
+                if isinstance(res, types.AsyncGeneratorType):
+                    stream_response = custom_streaming_response(res)
+                    first_chunk = await anext(stream_response, None)
+                    if first_chunk is None:
+                        retry_count += 1
+                        await chat_service.close_client()
+                        if retry_count == max_retries:
+                            raise HTTPException(status_code=204, detail="No content after max retries")
+                        continue
+                    background = BackgroundTask(chat_service.close_client)
+                    return StreamingResponse(stream_response, media_type="text/event-stream", background=background)
+                else:
+                    background = BackgroundTask(chat_service.close_client)
+                    return JSONResponse(res, media_type="application/json", background=background)
+            except HTTPException as e:
+                await chat_service.close_client()
+                if e.status_code == 500:
+                    logger.error(f"Server error, {str(e)}")
+                    raise HTTPException(status_code=500, detail="Server error")
+                raise HTTPException(status_code=e.status_code, detail=e.detail)
+            except Exception as e:
+                await chat_service.close_client()
+                logger.error(f"Server error, {str(e)}")
+                raise HTTPException(status_code=500, detail="Server error")
+        except Exception as e:
+            retry_count += 1
+            if retry_count == max_retries:
+                logger.error(f"Max retries reached. Final error: {str(e)}")
+                raise HTTPException(status_code=500, detail="Server error after max retries")
+            logger.warning(f"Retry {retry_count}/{max_retries}. Error: {str(e)}")
+            await asyncio.sleep(1)  # Wait for 1 second before retrying
 
 
 @app.get(f"/{api_prefix}/tokens" if api_prefix else "/tokens", response_class=HTMLResponse)
