@@ -127,6 +127,31 @@ async def error_tokens():
     error_tokens_list = list(set(globals.error_token_list))
     return {"status": "success", "error_tokens": error_tokens_list}
 
+from pydantic import BaseModel
+import time
+import json
+
+class TokenRefreshUpload(BaseModel):
+    refresh_token: str
+    access_token: str
+
+
+@app.post(f"/{api_prefix}/tokens/refresh/upload" if api_prefix else "/tokens/refresh/upload")
+async def refresh_upload_post(token_data: TokenRefreshUpload):
+    if not token_data.refresh_token or not token_data.access_token:
+        raise HTTPException(status_code=400, detail="Both refresh_token and access_token are required")
+
+    globals.refresh_map[token_data.refresh_token] = {"token": token_data.access_token, "timestamp": int(time.time())}
+    with open(globals.REFRESH_MAP_FILE, "w") as file:
+        json.dump(globals.refresh_map, file)
+
+    logger.info(f"refresh_token -> access_token with openai: {token_data.access_token}")
+
+    globals.token_list.append(token_data.access_token)
+    with open("data/token.txt", "a", encoding="utf-8") as f:
+        f.write(token_data.access_token + "\n")
+
+    return {"message": "Tokens processed successfully"}
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE"])
 async def reverse_proxy(request: Request, path: str):
