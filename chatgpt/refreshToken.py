@@ -22,10 +22,20 @@ async def rt2ac(refresh_token, force_refresh=False):
         return access_token
     else:
         try:
-            access_token = await chat_refresh(refresh_token)
+            access_token, new_refresh_token = await chat_refresh(refresh_token)
+
+            if refresh_token in globals.refresh_map:
+                del globals.refresh_map[refresh_token]
+
+            refresh_token = new_refresh_token
             globals.refresh_map[refresh_token] = {"token": access_token, "timestamp": int(time.time())}
             save_refresh_map(globals.refresh_map)
             logger.info(f"refresh_token -> access_token with openai: {access_token}")
+
+            globals.token_list.append(access_token)
+            with open("data/token.txt", "a", encoding="utf-8") as f:
+                f.write(access_token + "\n")
+
             return access_token
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code, detail=e.detail)
@@ -33,7 +43,7 @@ async def rt2ac(refresh_token, force_refresh=False):
 
 async def chat_refresh(refresh_token):
     data = {
-        "client_id": "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh",
+        "client_id": "DRivsnm2Mu42T3KOpqdtwB3NYviHYzwD",
         "grant_type": "refresh_token",
         "redirect_uri": "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback",
         "refresh_token": refresh_token
@@ -42,8 +52,10 @@ async def chat_refresh(refresh_token):
     try:
         r = await client.post("https://auth0.openai.com/oauth/token", json=data, timeout=5)
         if r.status_code == 200:
-            access_token = r.json()['access_token']
-            return access_token
+            json = r.json()
+            access_token = json['access_token']
+            refresh_token = json['refresh_token']
+            return access_token, refresh_token
         else:
             with open(globals.ERROR_TOKENS_FILE, "a", encoding="utf-8") as f:
                 f.write(refresh_token + "\n")
@@ -56,3 +68,11 @@ async def chat_refresh(refresh_token):
     finally:
         await client.close()
         del client
+
+def main():
+    import asyncio
+    refresh_token = 'v1.OadEUCpFvxGkYSMJgJuw6wFF_yEJSbApWXyiLNP3Lk_s6ljBEapi0iWrm7B5HrkrP71F_PrvKf3wElpryE8xzKQ'
+    asyncio.run(rt2ac(refresh_token, True))
+
+if __name__ == "__main__":
+    main()
