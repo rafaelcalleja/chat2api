@@ -25,6 +25,12 @@ async def rt2ac(refresh_token, force_refresh=False):
             access_token, new_refresh_token = await chat_refresh(refresh_token)
 
             if refresh_token in globals.refresh_map:
+                old_access_token = globals.refresh_map[refresh_token]['token']
+                if old_access_token in globals.token_list:
+                    for i, token in enumerate(globals.token_list):
+                        if token == old_access_token:
+                            del globals.token_list[i]
+                            break
                 del globals.refresh_map[refresh_token]
 
             refresh_token = new_refresh_token
@@ -40,6 +46,12 @@ async def rt2ac(refresh_token, force_refresh=False):
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code, detail=e.detail)
 
+async def ac2rt2ac(access_token, force_refresh=False):
+    for refresh_token in globals.refresh_map:
+        if globals.refresh_map[refresh_token]["token"] == access_token:
+            return await rt2ac(refresh_token, force_refresh=force_refresh)
+
+    raise HTTPException(status_code=404, detail="AccessToken not found")
 
 async def chat_refresh(refresh_token):
     data = {
