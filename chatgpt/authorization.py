@@ -46,10 +46,16 @@ async def verify_token(req_token):
 
 async def refresh_all_tokens(force_refresh=False):
     for token in globals.token_list:
-        if len(token) == 45:
+        if token.startswith("eyJhbGciOi"):
             try:
                 await asyncio.sleep(2)
                 await ac2rt2ac(token, force_refresh=force_refresh)
+            except HTTPException:
+                pass
+        if len(token) == 45:
+            try:
+                await asyncio.sleep(2)
+                await rt2ac(token, force_refresh=force_refresh)
             except HTTPException:
                 pass
     logger.info("All tokens refreshed.")

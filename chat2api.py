@@ -135,6 +135,15 @@ class TokenRefreshUpload(BaseModel):
     refresh_token: str
     access_token: str
 
+#curl -X POST "http://localhost:3040/tokens/refresh/upload"      -H "Content-Type: application/json"      -d '{
+#         "refresh_token": "your_refresh_token_here",
+#         "access_token": "your_access_token_here"
+#     }'
+
+@app.post(f"/{api_prefix}/tokens/refresh" if api_prefix else "/tokens/refresh")
+async def tokens_refresh(request: Request):
+    await refresh_all_tokens(force_refresh=True)
+    return {}
 
 @app.post(f"/{api_prefix}/tokens/refresh/upload" if api_prefix else "/tokens/refresh/upload")
 async def refresh_upload_post(token_data: TokenRefreshUpload):
