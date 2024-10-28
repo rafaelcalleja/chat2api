@@ -52,7 +52,7 @@ async def refresh_all_tokens(force_refresh=False):
                 await ac2rt2ac(token, force_refresh=force_refresh)
             except HTTPException:
                 pass
-        if len(token) == 45:
+        if len(token) == 45 or len(token) == 90:
             try:
                 await asyncio.sleep(2)
                 await rt2ac(token, force_refresh=force_refresh)
