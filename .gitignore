@@ -5,3 +5,5 @@
 /tmp/
 /data/
 /chatgpt/data/
+/.venv/
+/.vscode/

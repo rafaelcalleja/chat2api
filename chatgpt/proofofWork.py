@@ -388,10 +388,25 @@ class ScriptSrcParser(HTMLParser):
             if "src" in attrs_dict:
                 src = attrs_dict["src"]
                 cached_scripts.append(src)
-                # if "dpl" in src:
-                #     cached_dpl = src[src.index("dpl"):]
-                #     logger.info(f"Found dpl: {cached_dpl}")
-                #     cached_time = int(time.time())
+                match = re.search(r"c/[^/]*/_", src)
+                if match:
+                    cached_dpl = match.group(0)
+                    cached_time = int(time.time())
+
+
+def get_data_build_from_html(html_content):
+    global cached_scripts, cached_dpl, cached_time
+    parser = ScriptSrcParser()
+    parser.feed(html_content)
+    if not cached_scripts:
+        cached_scripts.append("https://chatgpt.com/backend-api/sentinel/sdk.js")
+    if not cached_dpl:
+        match = re.search(r'<html[^>]*data-build="([^"]*)"', html_content)
+        if match:
+            data_build = match.group(1)
+            cached_dpl = data_build
+            cached_time = int(time.time())
+            logger.info(f"Found dpl: {cached_dpl}")
 
 
 async def get_dpl(service):
@@ -399,29 +414,21 @@ async def get_dpl(service):
     if int(time.time()) - cached_time < 15 * 60:
         return True
     headers = service.base_headers.copy()
-    cached_scripts.clear()
+    cached_scripts = []
+    cached_dpl = ""
     try:
         if conversation_only:
             return True
-        r = await service.s.get(f"{service.host_url}/?oai-dm=1", headers=headers, timeout=5)
+        r = await service.s.get(f"{service.host_url}/", headers=headers, timeout=5)
         r.raise_for_status()
-        parser = ScriptSrcParser()
-        parser.feed(r.text)
-        if len(cached_scripts) == 0:
-            raise Exception("No scripts found")
+        get_data_build_from_html(r.text)
+        if not cached_dpl:
+            raise Exception("No Cached DPL")
         else:
-            pattern = re.compile(r"c/[^/]*/_")
-            for url in cached_scripts:
-                match = pattern.search(url)
-                if match:
-                    cached_dpl = match.group(0)
-                    cached_time = int(time.time())
-                    break
             return True
-    except Exception:
-        cached_scripts.append(
-            "https://cdn.oaistatic.com/_next/static/chunks/5592-9b41e2c3446199fd.js")
-        cached_dpl = "c/evFLS4pFqOh20V7PULt_e/_"
+    except Exception as e:
+        logger.info(f"Failed to get dpl: {e}")
+        cached_dpl = None
         cached_time = int(time.time())
         return False
 
@@ -440,7 +447,7 @@ def get_config(user_agent):
         4294705152,
         0,
         user_agent,
-        random.choice(cached_scripts),
+        random.choice(cached_scripts) if cached_scripts else None,
         cached_dpl,
         "en-US",
         "en-US,es-US,en,es",
