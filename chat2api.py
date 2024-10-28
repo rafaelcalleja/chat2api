@@ -2,6 +2,8 @@ import asyncio
 import time
 import types
 import warnings
+import requests
+import base64
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request, Depends, HTTPException, Form
@@ -130,7 +132,58 @@ async def error_tokens():
     error_tokens_list = list(set(globals.error_token_list))
     return {"status": "success", "error_tokens": error_tokens_list}
 
+from pydantic import BaseModel
+import time
+import json
 
+class TokenRefreshUpload(BaseModel):
+    refresh_token: str
+    access_token: str
+
+#curl -X POST "http://localhost:3040/tokens/refresh/upload"      -H "Content-Type: application/json"      -d '{
+#         "refresh_token": "your_refresh_token_here",
+#         "access_token": "your_access_token_here"
+#     }'
+
+@app.post(f"/{api_prefix}/tokens/refresh" if api_prefix else "/tokens/refresh")
+async def tokens_refresh(request: Request):
+    await refresh_all_tokens(force_refresh=True)
+    return {}
+
+@app.post(f"/{api_prefix}/tokens/refresh/upload" if api_prefix else "/tokens/refresh/upload")
+async def refresh_upload_post(token_data: TokenRefreshUpload):
+    if not token_data.refresh_token or not token_data.access_token:
+        raise HTTPException(status_code=400, detail="Both refresh_token and access_token are required")
+
+    globals.refresh_map[token_data.refresh_token] = {"token": token_data.access_token, "timestamp": int(time.time())}
+    with open(globals.REFRESH_MAP_FILE, "w") as file:
+        json.dump(globals.refresh_map, file)
+
+    logger.info(f"refresh_token -> access_token with openai: {token_data.access_token}")
+
+    globals.token_list.append(token_data.access_token)
+    with open("data/token.txt", "a", encoding="utf-8") as f:
+        f.write(token_data.access_token + "\n")
+
+    if globals.REFRESH_MAP_URL:
+        headers = {
+            'accept': 'application/json',
+            'authorization': f'Bearer {globals.REFRESH_MAP_URL_AUTH}'
+        }
+
+        params = {'value': base64.b64encode(json.dumps(globals.refresh_map).encode('utf-8')).decode('utf-8')}
+        requests.post(f"{globals.REFRESH_MAP_URL}/pop", headers=headers)
+        response = requests.post(f"{globals.REFRESH_MAP_URL}/push", headers=headers, params=params)
+
+        logger.info(f"Refresh Map saved status: {response.status_code}")
+
+    return {"message": "Tokens processed successfully"}
+
+<<<<<<< HEAD
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE"])
+async def reverse_proxy(request: Request, path: str):
+    return await chatgpt_reverse_proxy(request, path)
+=======
 @app.get(f"/{api_prefix}/tokens/add/{{token}}" if api_prefix else "/tokens/add/{token}")
 async def add_token(token: str):
     if token.strip() and not token.startswith("#"):
@@ -252,3 +305,4 @@ else:
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE"])
     async def reverse_proxy():
         raise HTTPException(status_code=404, detail="Gateway is disabled")
+>>>>>>> main

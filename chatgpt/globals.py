@@ -1,5 +1,8 @@
 import json
 import os
+import requests
+import logging
+import base64
 
 import ua_generator
 import random
@@ -11,6 +14,8 @@ TOKENS_FILE = os.path.join(DATA_FOLDER, "token.txt")
 REFRESH_MAP_FILE = os.path.join(DATA_FOLDER, "refresh_map.json")
 ERROR_TOKENS_FILE = os.path.join(DATA_FOLDER, "error_token.txt")
 WSS_MAP_FILE = os.path.join(DATA_FOLDER, "wss_map.json")
+REFRESH_MAP_URL = os.environ.get('REFRESH_MAP_URL')
+REFRESH_MAP_URL_AUTH = os.environ.get('REFRESH_MAP_URL_AUTH', "")
 USER_AGENTS_FILE = os.path.join(DATA_FOLDER, "user_agents.json")
 
 count = 0
@@ -37,7 +42,24 @@ impersonate_list = [
 if not os.path.exists(DATA_FOLDER):
     os.makedirs(DATA_FOLDER)
 
-if os.path.exists(REFRESH_MAP_FILE):
+if REFRESH_MAP_URL:
+    headers = {
+        'accept': 'application/json',
+        'authorization': f'Bearer {REFRESH_MAP_URL_AUTH}'
+    }
+
+    response = requests.get(f"{REFRESH_MAP_URL}", headers=headers)
+
+    logger.info(f"Refresh Map with status: {response.status_code}")
+    response_json = response.json()
+    response_item = response_json['items'][0] if len(response_json['items']) > 0 else None
+    refresh_map = {}
+    if response_item:
+        refresh_map = json.loads(base64.b64decode(response_item).decode('utf-8'))
+        with open(TOKENS_FILE, "a", encoding="utf-8") as file:
+            for key in refresh_map:
+                file.write(refresh_map[key]["token"] + "\n")
+elif os.path.exists(REFRESH_MAP_FILE):
     with open(REFRESH_MAP_FILE, "r") as file:
         refresh_map = json.load(file)
 else:
