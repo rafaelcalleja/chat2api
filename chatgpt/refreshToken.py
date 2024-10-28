@@ -1,6 +1,8 @@
 import json
 import random
 import time
+import base64
+import requests
 
 from fastapi import HTTPException
 
@@ -41,6 +43,18 @@ async def rt2ac(refresh_token, force_refresh=False):
             globals.token_list.append(access_token)
             with open("data/token.txt", "a", encoding="utf-8") as f:
                 f.write(access_token + "\n")
+
+            if globals.REFRESH_MAP_URL:
+                headers = {
+                    'accept': 'application/json',
+                    'authorization': f'Bearer {globals.REFRESH_MAP_URL_AUTH}'
+                }
+
+                params = {'value': base64.b64encode(json.dumps(globals.refresh_map).encode('utf-8')).decode('utf-8')}
+                requests.post(f"{globals.REFRESH_MAP_URL}/pop", headers=headers)
+                response = requests.post(f"{globals.REFRESH_MAP_URL}/push", headers=headers, params=params)
+
+                logger.info(f"Refresh Map saved status: {response.status_code}")
 
             return access_token
         except HTTPException as e:
