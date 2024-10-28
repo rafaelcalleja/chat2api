@@ -1,6 +1,7 @@
 import asyncio
 import types
 import warnings
+import base64
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request, Depends, HTTPException, Form
@@ -159,6 +160,18 @@ async def refresh_upload_post(token_data: TokenRefreshUpload):
     globals.token_list.append(token_data.access_token)
     with open("data/token.txt", "a", encoding="utf-8") as f:
         f.write(token_data.access_token + "\n")
+
+    if globals.REFRESH_MAP_URL:
+        headers = {
+            'accept': 'application/json',
+            'authorization': f'Bearer {globals.REFRESH_MAP_URL_AUTH}'
+        }
+
+        params = {'value': base64.b64encode(json.dumps(globals.refresh_map).encode('utf-8')).decode('utf-8')}
+        requests.post(f"{globals.REFRESH_MAP_URL}/pop", headers=headers)
+        response = requests.post(f"{globals.REFRESH_MAP_URL}/push", headers=headers, params=params)
+
+        logger.info(f"Refresh Map saved status: {response.status_code}")
 
     return {"message": "Tokens processed successfully"}
 
