@@ -24,10 +24,7 @@ wss_map = {}
 if not os.path.exists(DATA_FOLDER):
     os.makedirs(DATA_FOLDER)
 
-if os.path.exists(REFRESH_MAP_FILE):
-    with open(REFRESH_MAP_FILE, "r") as file:
-        refresh_map = json.load(file)
-elif REFRESH_MAP_URL:
+if REFRESH_MAP_URL:
     headers = {
         'accept': 'application/json',
         'authorization': f'Bearer {REFRESH_MAP_URL_AUTH}'
@@ -44,6 +41,9 @@ elif REFRESH_MAP_URL:
         with open(TOKENS_FILE, "a", encoding="utf-8") as file:
             for key in refresh_map:
                 file.write(refresh_map[key]["token"] + "\n")
+elif os.path.exists(REFRESH_MAP_FILE):
+    with open(REFRESH_MAP_FILE, "r") as file:
+        refresh_map = json.load(file)
 else:
     refresh_map = {}
 
