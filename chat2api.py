@@ -1,6 +1,7 @@
 import asyncio
 import types
 import warnings
+import requests
 import base64
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
