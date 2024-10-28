@@ -304,13 +304,13 @@ class ChatService:
                         check_is_limit(detail, token=self.req_token, model=self.req_model)
                 else:
                     if "cf-please-wait" in rtext:
-                        # logger.error(f"Failed to send conversation: cf-please-wait")
+                        logger.error(f"Failed to send conversation: cf-please-wait")
                         raise HTTPException(status_code=r.status_code, detail="cf-please-wait")
                     if r.status_code == 429:
-                        # logger.error(f"Failed to send conversation: rate-limit")
+                        logger.error(f"Failed to send conversation: rate-limit")
                         raise HTTPException(status_code=r.status_code, detail="rate-limit")
                     detail = r.text[:100]
-                # logger.error(f"Failed to send conversation: {detail}")
+                logger.error(f"Failed to send conversation: {detail}")
                 raise HTTPException(status_code=r.status_code, detail=detail)
 
             content_type = r.headers.get("Content-Type", "")
@@ -327,13 +327,17 @@ class ChatService:
             elif "application/json" in content_type:
                 rtext = await r.atext()
                 resp = json.loads(rtext)
+                logger.error(f"Failed server json code:{r.status_code}: {resp}")
                 raise HTTPException(status_code=r.status_code, detail=resp)
             else:
                 rtext = await r.atext()
+                logger.error(f"Failed server {url}:{r.status_code}: {rtext}")
                 raise HTTPException(status_code=r.status_code, detail=rtext)
         except HTTPException as e:
+            logger.error(f"Failed server code:{e.status_code}: {se.detail}")
             raise HTTPException(status_code=e.status_code, detail=e.detail)
         except Exception as e:
+            logger.error(f"Failed server 500: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
     async def get_download_url(self, file_id):
