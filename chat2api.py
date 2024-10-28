@@ -179,11 +179,10 @@ async def refresh_upload_post(token_data: TokenRefreshUpload):
 
     return {"message": "Tokens processed successfully"}
 
-<<<<<<< HEAD
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE"])
 async def reverse_proxy(request: Request, path: str):
     return await chatgpt_reverse_proxy(request, path)
-=======
+
 @app.get(f"/{api_prefix}/tokens/add/{{token}}" if api_prefix else "/tokens/add/{token}")
 async def add_token(token: str):
     if token.strip() and not token.startswith("#"):
@@ -305,4 +304,3 @@ else:
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE"])
     async def reverse_proxy():
         raise HTTPException(status_code=404, detail="Gateway is disabled")
->>>>>>> main
