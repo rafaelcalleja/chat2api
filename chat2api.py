@@ -173,7 +173,7 @@ async def refresh_upload_post(token_data: TokenRefreshUpload):
 
         params = {'value': base64.b64encode(json.dumps(globals.refresh_map).encode('utf-8')).decode('utf-8')}
         requests.post(f"{globals.REFRESH_MAP_URL}/pop", headers=headers)
-        response = requests.post(f"{globals.REFRESH_MAP_URL}/push", headers=headers, params=params)
+        response = requests.post(f"{globals.REFRESH_MAP_URL}/push", headers=headers, data=params)
 
         logger.info(f"Refresh Map saved status: {response.status_code}")
 
