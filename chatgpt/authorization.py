@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 import utils.configs as configs
 import utils.globals as globals
-from chatgpt.refreshToken import rt2ac
+from chatgpt.refreshToken import rt2ac, ac2rt2ac
 from utils.Logger import logger
 
 
@@ -69,7 +69,13 @@ async def verify_token(req_token):
 
 async def refresh_all_tokens(force_refresh=False):
     for token in list(set(globals.token_list) - set(globals.error_token_list)):
-        if len(token) == 45:
+        if token.startswith("eyJhbGciOi"):
+            try:
+                await asyncio.sleep(2)
+                await ac2rt2ac(token, force_refresh=force_refresh)
+            except HTTPException:
+                pass
+        if len(token) == 45 or len(token) == 90:
             try:
                 await asyncio.sleep(0.5)
                 await rt2ac(token, force_refresh=force_refresh)
