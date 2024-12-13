@@ -21,23 +21,23 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v2
 
-      - name: Read the version from version.txt
-        id: get_version
-        run: |
-          version=$(cat version.txt)
-          echo "Current version: v$version"
-          echo "::set-output name=version::v$version"
-
-      - name: Commit and push version tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version=${{ steps.get_version.outputs.version }}
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git tag "$version"
-          git push https://x-access-token:${GHCR_PAT}@github.com/lanqian528/chat2api.git "$version"
-
+      #- name: Read the version from version.txt
+      #  id: get_version
+      #  run: |
+      #    version=$(cat version.txt)
+      #    echo "Current version: v$version"
+      #    echo "::set-output name=version::v$version"
+      #
+      #- name: Commit and push version tag
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #  run: |
+      #    version=${{ steps.get_version.outputs.version }}
+      #    git config --local user.email "action@github.com"
+      #    git config --local user.name "GitHub Action"
+      #    git tag "$version"
+      #    git push https://x-access-token:${GHCR_PAT}@github.com/lanqian528/chat2api.git "$version"
+      #
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -47,6 +47,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
@@ -54,10 +55,10 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: lanqian528/chat2api
+          images: ${{ secrets.DOCKER_IMAGE }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.get_version.outputs.version }}
+#            type=raw,value=${{ steps.get_version.outputs.version }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
